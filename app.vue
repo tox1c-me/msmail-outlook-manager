@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import { theme as antTheme } from 'ant-design-vue'
+
 const route = useRoute()
 const isMailboxPage = computed(() => route.path.startsWith('/account/'))
+const colorMode = ref<'light' | 'dark'>('light')
+const isDarkMode = computed(() => colorMode.value === 'dark')
 const showHeader = computed(() => {
   if (route.path === '/') {
     return false
@@ -25,14 +29,39 @@ const pageLabel = computed(() => {
   return '工作台'
 })
 
-const themeConfig = {
+const themeConfig = computed(() => ({
+  algorithm: isDarkMode.value ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
   token: {
     colorPrimary: '#1677ff',
     borderRadius: 14,
-    colorBgLayout: '#f3f6fb',
-    colorTextBase: '#1f2937',
+    colorBgLayout: isDarkMode.value ? '#0f172a' : '#f3f6fb',
+    colorTextBase: isDarkMode.value ? '#e5e7eb' : '#1f2937',
     fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
   },
+}))
+
+onMounted(() => {
+  const savedMode = window.localStorage.getItem('msmail-color-mode')
+  colorMode.value = savedMode === 'dark' ? 'dark' : 'light'
+})
+
+watch(
+  colorMode,
+  (mode) => {
+    if (!import.meta.client) {
+      return
+    }
+
+    document.documentElement.dataset.theme = mode
+    window.localStorage.setItem('msmail-color-mode', mode)
+  },
+  {
+    immediate: true,
+  },
+)
+
+function toggleColorMode() {
+  colorMode.value = isDarkMode.value ? 'light' : 'dark'
 }
 </script>
 
@@ -67,6 +96,19 @@ const themeConfig = {
           <NuxtPage />
         </div>
       </ALayoutContent>
+
+      <button
+        type="button"
+        :class="['theme-toggle', { 'theme-toggle--dark': isDarkMode }]"
+        :aria-pressed="isDarkMode"
+        :aria-label="isDarkMode ? '切换为浅色模式' : '切换为暗黑模式'"
+        :title="isDarkMode ? '切换为浅色模式' : '切换为暗黑模式'"
+        @click="toggleColorMode"
+      >
+        <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true">☀</span>
+        <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true">☾</span>
+        <span class="theme-toggle__thumb" aria-hidden="true" />
+      </button>
     </ALayout>
   </AConfigProvider>
 </template>

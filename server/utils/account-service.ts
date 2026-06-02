@@ -1,5 +1,6 @@
 import type {
   AccountTagColor,
+  AccountNoteColor,
   AccountListItem,
   ImportAccountsResult,
   ImportLineError,
@@ -7,7 +8,7 @@ import type {
   RefreshAccountFailure,
   RefreshExpiredAccountsResult,
 } from '~/shared/types'
-import { ACCOUNT_TAG_COLORS, MAIL_PROTOCOLS } from '~/shared/types'
+import { ACCOUNT_NOTE_COLORS, ACCOUNT_TAG_COLORS, MAIL_PROTOCOLS } from '~/shared/types'
 import {
   ACCOUNT_IMPORT_SEPARATOR,
   formatAccountImportLine,
@@ -31,10 +32,46 @@ interface AccountRecord {
   refreshToken: string
   mailProtocol: string
   tagColor: string | null
+  note: string | null
+  noteColor: string | null
   accessToken: string | null
   tokenExpires: Date | null
   createdAt: Date
   updatedAt: Date
+}
+
+interface OAuthAccountInput {
+  email: string
+  clientId: string
+  refreshToken: string
+  accessToken: string
+  tokenExpires: Date
+  mailProtocol: MailProtocol
+}
+
+export async function upsertOAuthAccount(input: OAuthAccountInput) {
+  return prisma.account.upsert({
+    where: {
+      email: input.email,
+    },
+    update: {
+      password: 'oauth-login',
+      clientId: input.clientId,
+      refreshToken: input.refreshToken,
+      accessToken: input.accessToken,
+      tokenExpires: input.tokenExpires,
+      mailProtocol: input.mailProtocol,
+    },
+    create: {
+      email: input.email,
+      password: 'oauth-login',
+      clientId: input.clientId,
+      refreshToken: input.refreshToken,
+      accessToken: input.accessToken,
+      tokenExpires: input.tokenExpires,
+      mailProtocol: input.mailProtocol,
+    },
+  })
 }
 
 export async function importAccountsFromText(rawText: string, mailProtocol: MailProtocol) {
@@ -247,6 +284,26 @@ export async function updateAccountTagById(id: number, tagColor: AccountTagColor
   return toAccountListItem(account)
 }
 
+export async function updateAccountNoteById(id: number, note: string | null, noteColor: AccountNoteColor) {
+  const existing = await prisma.account.findUnique({
+    where: { id },
+  })
+
+  if (!existing) {
+    throw appError(404, 'ACCOUNT_NOT_FOUND', '账号不存在')
+  }
+
+  const account = await prisma.account.update({
+    where: { id },
+    data: {
+      note,
+      noteColor,
+    },
+  })
+
+  return toAccountListItem(account)
+}
+
 export async function refreshExpiredAccounts(): Promise<RefreshExpiredAccountsResult> {
   const now = new Date()
   const refreshableAccounts = await prisma.account.findMany({
@@ -355,6 +412,12 @@ function normalizeAccountTagColor(value: string | null | undefined): AccountTagC
     : null
 }
 
+function normalizeAccountNoteColor(value: string | null | undefined): AccountNoteColor {
+  return ACCOUNT_NOTE_COLORS.includes(value as AccountNoteColor)
+    ? (value as AccountNoteColor)
+    : 'gray'
+}
+
 export function normalizeMailProtocol(value: string | null | undefined): MailProtocol {
   return MAIL_PROTOCOLS.includes(value as MailProtocol)
     ? (value as MailProtocol)
@@ -369,6 +432,8 @@ function toAccountListItem(account: AccountRecord): AccountListItem {
     clientId: account.clientId,
     refreshToken: account.refreshToken,
     tagColor: normalizeAccountTagColor(account.tagColor),
+    note: account.note || null,
+    noteColor: normalizeAccountNoteColor(account.noteColor),
     hasRefreshToken: Boolean(account.refreshToken),
     hasAccessToken: Boolean(account.accessToken),
     tokenExpires: account.tokenExpires?.toISOString() ?? null,

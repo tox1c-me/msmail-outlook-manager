@@ -15,6 +15,8 @@ model Account {
   refreshToken String
   mailProtocol String   @default("graph")
   tagColor     String?
+  note         String?
+  noteColor    String?
   accessToken  String?
   tokenExpires DateTime?
   createdAt    DateTime @default(now())

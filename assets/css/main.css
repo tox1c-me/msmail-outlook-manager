@@ -8,6 +8,16 @@
   --shadow-soft: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --app-bg: #0f172a;
+  --panel-bg: #172033;
+  --panel-border: #2a3850;
+  --text-main: #e5e7eb;
+  --text-secondary: #a6b1c3;
+  --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.24);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -142,6 +152,87 @@ code {
 
 .app-header__tag {
   margin-inline-start: auto;
+}
+
+.theme-toggle {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  width: 68px;
+  height: 36px;
+  padding: 3px;
+  color: #f59e0b;
+  background: #dbeafe;
+  border: 1px solid rgba(22, 119, 255, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  box-shadow: 0 12px 28px rgba(22, 119, 255, 0.26);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.theme-toggle--dark {
+  color: #dbeafe;
+  background: #263653;
+  border-color: rgba(148, 163, 184, 0.34);
+}
+
+.theme-toggle__icon {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  transition:
+    color 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.theme-toggle__icon--moon {
+  color: #64748b;
+}
+
+.theme-toggle--dark .theme-toggle__icon--sun {
+  color: #94a3b8;
+}
+
+.theme-toggle--dark .theme-toggle__icon--moon {
+  color: #f8fafc;
+}
+
+.theme-toggle__thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 1;
+  width: 28px;
+  height: 28px;
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.2);
+  transition:
+    transform 0.22s ease,
+    background 0.2s ease;
+}
+
+.theme-toggle--dark .theme-toggle__thumb {
+  background: #111827;
+  transform: translateX(32px);
 }
 
 .app-content {
@@ -670,6 +761,38 @@ code {
   color: #475467;
 }
 
+.mailbox-list__item-note {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.account-note-color--gray {
+  color: #475467;
+}
+
+.account-note-color--blue {
+  color: #1677ff;
+}
+
+.account-note-color--green {
+  color: #16a34a;
+}
+
+.account-note-color--orange {
+  color: #d46b08;
+}
+
+.account-note-color--red {
+  color: #d92d20;
+}
+
+.account-note-color--purple {
+  color: #7c3aed;
+}
+
 .mailbox-list__item-actions {
   align-items: center;
   justify-content: flex-end;
@@ -915,6 +1038,106 @@ code {
   flex-wrap: wrap;
 }
 
+.mailbox-overview__note {
+  display: grid;
+  gap: 10px;
+  width: min(720px, 100%);
+  max-width: 720px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(248, 250, 253, 0.72);
+}
+
+.mailbox-overview__note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mailbox-overview__note-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.mailbox-overview__note-edit-button.ant-btn {
+  border-radius: 999px;
+}
+
+.mailbox-overview__note-text {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.mailbox-overview__note-text--empty {
+  color: #98a2b3;
+}
+
+.mailbox-overview__note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.mailbox-overview__note-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mailbox-overview__note-color-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mailbox-overview__note-color-option--active {
+  border-color: currentColor;
+  background: rgba(22, 119, 255, 0.06);
+  font-weight: 600;
+}
+
+.mailbox-overview__note-color-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.mailbox-overview__note-color-dot--gray {
+  background: #667085;
+}
+
+.mailbox-overview__note-color-dot--blue {
+  background: #1677ff;
+}
+
+.mailbox-overview__note-color-dot--green {
+  background: #16a34a;
+}
+
+.mailbox-overview__note-color-dot--orange {
+  background: #d46b08;
+}
+
+.mailbox-overview__note-color-dot--red {
+  background: #d92d20;
+}
+
+.mailbox-overview__note-color-dot--purple {
+  background: #7c3aed;
+}
+
 .mailbox-overview__tag-picker {
   align-items: center;
   justify-content: flex-end;
@@ -1082,6 +1305,18 @@ code {
   overflow-wrap: anywhere;
 }
 
+.mail-item__preview {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: #667085;
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .mail-item__meta {
   align-items: center;
   gap: 10px;
@@ -1239,6 +1474,96 @@ code {
 .account-table .ant-table-cell-fix-right,
 .account-table .ant-table-cell-fix-right-first {
   background: var(--panel-bg);
+}
+
+.mailbox-overview__note-text.account-note-color--gray,
+.mailbox-list__item-note.account-note-color--gray {
+  color: #475467;
+}
+
+.mailbox-overview__note-text.account-note-color--blue,
+.mailbox-list__item-note.account-note-color--blue {
+  color: #1677ff;
+}
+
+.mailbox-overview__note-text.account-note-color--green,
+.mailbox-list__item-note.account-note-color--green {
+  color: #16a34a;
+}
+
+.mailbox-overview__note-text.account-note-color--orange,
+.mailbox-list__item-note.account-note-color--orange {
+  color: #d46b08;
+}
+
+.mailbox-overview__note-text.account-note-color--red,
+.mailbox-list__item-note.account-note-color--red {
+  color: #d92d20;
+}
+
+.mailbox-overview__note-text.account-note-color--purple,
+.mailbox-list__item-note.account-note-color--purple {
+  color: #7c3aed;
+}
+
+:root[data-theme='dark'] body {
+  background:
+    radial-gradient(circle at top left, rgba(22, 119, 255, 0.15), transparent 24%),
+    linear-gradient(180deg, #111b2d 0%, var(--app-bg) 100%);
+}
+
+:root[data-theme='dark'] .app-header {
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom-color: rgba(42, 56, 80, 0.9);
+}
+
+:root[data-theme='dark'] .workspace-sidebar__hero,
+:root[data-theme='dark'] .mailbox-overview__metric--highlight {
+  background:
+    radial-gradient(circle at top right, rgba(22, 119, 255, 0.2), transparent 42%),
+    linear-gradient(160deg, #17243a 0%, #141e30 100%);
+  border-color: rgba(105, 177, 255, 0.2);
+}
+
+:root[data-theme='dark'] .workspace-sidebar__stat,
+:root[data-theme='dark'] .mailbox-list__item,
+:root[data-theme='dark'] .mailbox-overview__metric,
+:root[data-theme='dark'] .mail-list-item {
+  background: linear-gradient(180deg, #1b2639 0%, #172033 100%);
+  border-color: rgba(71, 85, 105, 0.52);
+}
+
+:root[data-theme='dark'] .mailbox-list__item--active {
+  background: linear-gradient(180deg, #1b2c49 0%, #18253a 100%);
+  border-color: rgba(105, 177, 255, 0.46);
+}
+
+:root[data-theme='dark'] .mailbox-list__item-meta,
+:root[data-theme='dark'] .mailbox-overview__note,
+:root[data-theme='dark'] .mail-body,
+:root[data-theme='dark'] .mail-item__address,
+:root[data-theme='dark'] .mail-item__time {
+  background: rgba(15, 23, 42, 0.6);
+  border-color: rgba(71, 85, 105, 0.52);
+}
+
+:root[data-theme='dark'] .mailbox-list__item-meta-row .table-cell__subtext,
+:root[data-theme='dark'] .mail-item__subject,
+:root[data-theme='dark'] .mail-item__sender {
+  color: #d5dbea;
+}
+
+:root[data-theme='dark'] .mailbox-overview__note-color-option,
+:root[data-theme='dark'] .workspace-sidebar__tag-trigger,
+:root[data-theme='dark'] .workspace-sidebar__tag-filter-option,
+:root[data-theme='dark'] .page-toolbar__select {
+  background-color: #172033;
+  border-color: rgba(100, 116, 139, 0.6);
+}
+
+:root[data-theme='dark'] .mailbox-overview__note-text.account-note-color--gray,
+:root[data-theme='dark'] .mailbox-list__item-note.account-note-color--gray {
+  color: #a6b1c3;
 }
 
 .page-card__subtitle,

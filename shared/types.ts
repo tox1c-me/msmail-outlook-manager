@@ -21,6 +21,17 @@ export const ACCOUNT_TAG_COLORS = [
 
 export type AccountTagColor = (typeof ACCOUNT_TAG_COLORS)[number]
 
+export const ACCOUNT_NOTE_COLORS = [
+  'gray',
+  'blue',
+  'green',
+  'orange',
+  'red',
+  'purple',
+] as const
+
+export type AccountNoteColor = (typeof ACCOUNT_NOTE_COLORS)[number]
+
 export interface AccountListItem {
   id: number
   email: string
@@ -28,6 +39,8 @@ export interface AccountListItem {
   clientId: string
   refreshToken: string
   tagColor: AccountTagColor | null
+  note: string | null
+  noteColor: AccountNoteColor
   hasRefreshToken: boolean
   hasAccessToken: boolean
   tokenExpires: string | null
@@ -67,6 +80,7 @@ export interface MailSummary {
   fromName: string
   fromAddress: string
   receivedAt: string
+  preview: string
   hasAttachments: boolean
   isRead: boolean
 }

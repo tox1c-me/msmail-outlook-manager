@@ -16,6 +16,7 @@ interface GraphListResponse {
       }
     }
     receivedDateTime?: string
+    bodyPreview?: string | null
     hasAttachments?: boolean
     isRead?: boolean
   }>
@@ -53,7 +54,7 @@ interface GraphDetailResponse {
 
 export async function listGraphAccountMessages(email: string, limit: number) {
   const params = new URLSearchParams({
-    '$select': 'id,subject,from,receivedDateTime,hasAttachments,isRead',
+    '$select': 'id,subject,from,receivedDateTime,bodyPreview,hasAttachments,isRead',
     '$orderby': 'receivedDateTime DESC',
     '$top': String(limit),
   })
@@ -76,6 +77,7 @@ export async function listGraphAccountMessages(email: string, limit: number) {
           fromName: message.from?.emailAddress?.name?.trim() || '未知发件人',
           fromAddress: message.from?.emailAddress?.address?.trim() || '-',
           receivedAt: message.receivedDateTime || '',
+          preview: message.bodyPreview?.trim() || '',
           hasAttachments: Boolean(message.hasAttachments),
           isRead: Boolean(message.isRead),
         }) satisfies MailSummary,

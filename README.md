@@ -2,20 +2,35 @@
 
 一个基于 `Nuxt 4 + Nitro + Prisma + SQLite` 的微软邮箱账号管理与邮件查询工作台。
 
-它面向“**已经拿到微软邮箱授权信息**”的场景，帮助你集中管理账号、查看最近邮件、进入详情页核对正文，并通过带 `x-api-key` 的只读接口向其他系统提供邮件查询能力。
+> [!NOTE]
+> 本仓库为基于 [Marsor707/msmail](https://github.com/Marsor707/msmail) 的二次开发版本，扩展了本地 OAuth 弹窗登录、账号自动导入、邮箱备注、邮件摘要、暗黑模式与 Windows 一键启动等功能。
+
+它面向需要集中管理 Outlook 邮箱账号的场景，帮助你完成微软账号授权登录、账号导入、最近邮件查看、正文核对，并通过带 `x-api-key` 的只读接口向其他系统提供邮件查询能力。
 
 > [!IMPORTANT]
-> 当前版本**不负责 OAuth 授权申请流程**，也**不提供发信能力**。
-> 使用前请自行准备可用于 `Graph` 或 `IMAP OAuth2` 的 `client_id` 和 `refresh_token`。
+> 当前版本提供本地 OAuth 登录入口，但仍需自行在 Microsoft Entra 中注册应用并配置回调地址。
+> 系统定位为只读邮件管理工作台，暂不提供发信能力。
+
+## 作品亮点
+
+- 集成 Microsoft OAuth 2.0 + PKCE：本地弹出 Outlook 登录窗口，授权完成后自动导入邮箱账号
+- 支持 Microsoft Graph 与 IMAP OAuth2 两种收件方式，统一账号管理入口
+- 首页展示最近邮件、正文摘要、未读状态、附件状态与账号 Token 状态
+- 支持邮箱备注、备注字体颜色和 7 色账号标签，方便区分账号用途
+- 提供太阳 / 月亮滑动开关，一键切换浅色与暗黑模式并记住用户偏好
+- 提供 Windows 一键启动与停止脚本，启动服务后自动打开本地管理页面
+- 使用 Prisma + SQLite 保存本地账号配置，适合个人工具和单机部署
 
 ## 功能概览
 
 ### 账号管理
 
 - 批量导入邮箱账号，支持文本粘贴和本地 TXT 文件导入
+- 支持弹出 Outlook 登录窗口，授权完成后自动导入账号
 - 导入时可在弹窗中统一选择 `Graph` 或 `IMAP` 收件协议
 - 同邮箱重新导入时会覆盖本地凭据，并清空旧 `access_token` 缓存
 - 支持左侧列表搜索、勾选导出、单条复制导入串、删除本地配置
+- 支持为账号添加备注，并选择备注字体颜色
 
 ### 首页工作台
 
@@ -23,6 +38,8 @@
 - 右侧账号卡片支持直接打标签，再次点击同色可清除标签
 - 中部概览区展示 `Token 状态`、最近更新时间、未读统计、附件统计、最新来信
 - 下方邮件列表支持切换最近 `10 / 20 / 50 / 100` 封
+- 邮件卡片展示正文摘要，便于不进入详情页时快速判断内容
+- 支持太阳 / 月亮滑动开关，一键切换浅色与暗黑模式
 
 ### 邮件读取
 
@@ -41,16 +58,17 @@
 ## 典型使用流程
 
 1. 在首页点击“导入账号”，选择 `Graph` 或 `IMAP`。
-2. 粘贴或导入 TXT 文本，格式固定为：
+2. 推荐填写 Microsoft Entra 应用的 `client_id`，点击“登录 Outlook 并自动导入”。
+3. 如需兼容旧版批量导入，可粘贴或导入 TXT 文本，格式固定为：
 
 ```txt
 email----password----client_id----refresh_token
 ```
 
-3. 导入完成后，在左侧列表搜索、筛选或勾选导出账号。
-4. 选中某个邮箱后，在右侧查看状态概览和最近邮件。
-5. 进入详情页查看正文；如账号走 `IMAP`，详情读取成功后会同步标记已读。
-6. 如需系统间集成，可直接调用 `/api/external/emails` 与 `/api/external/emails/detail`。
+4. 导入完成后，在左侧列表搜索、筛选或勾选导出账号。
+5. 选中某个邮箱后，在右侧查看状态概览和最近邮件。
+6. 进入详情页查看正文；如账号走 `IMAP`，详情读取成功后会同步标记已读。
+7. 如需系统间集成，可直接调用 `/api/external/emails` 与 `/api/external/emails/detail`。
 
 > [!NOTE]
 > 协议不会写进 TXT 文本，而是在导入弹窗中统一选择；本次导入的账号都会写入当前所选协议。
@@ -106,6 +124,9 @@ cp .env.example .env
 DATABASE_URL="file:./data/mailbox.db"
 APP_API_KEY="please-change-me"
 MS_TOKEN_ENDPOINT="https://login.microsoftonline.com/common/oauth2/v2.0/token"
+MS_AUTHORIZE_ENDPOINT="https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+MS_CLIENT_ID=""
+MS_REDIRECT_URI="http://localhost:3000/api/oauth/microsoft/callback"
 MS_GRAPH_SCOPE="offline_access Mail.Read"
 MS_IMAP_SCOPE="https://outlook.office.com/IMAP.AccessAsUser.All offline_access"
 MS_IMAP_HOST="outlook.office365.com"
@@ -117,6 +138,9 @@ MS_IMAP_PORT="993"
 - `DATABASE_URL` 默认对应仓库中的 `prisma/data/mailbox.db`
 - `APP_API_KEY` 用于保护对外只读接口，开源部署时务必替换
 - `MS_TOKEN_ENDPOINT` 默认为微软公共租户 token 地址；如你使用自定义租户，可按需覆盖
+- `MS_AUTHORIZE_ENDPOINT` 用于发起 Microsoft OAuth 登录
+- `MS_CLIENT_ID` 可选；也可以在前端导入弹窗中填写并保存在本机浏览器
+- `MS_REDIRECT_URI` 需要与 Microsoft Entra 应用中配置的回调地址保持一致
 - `MS_GRAPH_SCOPE` 默认要求 `offline_access Mail.Read`
 - `MS_IMAP_SCOPE` 默认要求 `https://outlook.office.com/IMAP.AccessAsUser.All offline_access`
 - `MS_IMAP_HOST` / `MS_IMAP_PORT` 为 Outlook IMAP 服务地址
@@ -160,6 +184,17 @@ npm run preview
 # 重新生成 README 演示截图
 npm run readme:screenshots
 ```
+
+### Windows 本地一键启动
+
+仓库提供了两个脚本：
+
+```txt
+start-local.cmd
+stop-local.cmd
+```
+
+双击 `start-local.cmd` 会启动服务并自动打开 `http://localhost:3000`。双击 `stop-local.cmd` 可停止本地服务。
 
 > [!NOTE]
 > `npm run readme:screenshots` 会启动本地 Nuxt 开发服务，并使用 `README_SCREENSHOT_MODE=1` 的演示数据重新截图。
@@ -230,6 +265,7 @@ curl "http://localhost:3000/api/external/emails/detail?email=ops-team@contoso.te
 ## 安全说明
 
 - 不要提交真实 `.env`、真实数据库文件、真实导入文本
+- 发布前确认未提交 `prisma/dev.db`、`prisma/data/*.db` 和任何日志文件
 - 导入数据包含邮箱密码、`client_id`、`refresh_token`，请仅在受控环境中使用
 - 开源展示时，统一使用脱敏截图、演示账号和演示接口参数
 - README 演示图建议继续使用 `.test` 域名和占位凭据，不要复用真实地址

@@ -15,6 +15,7 @@ import Modal from 'ant-design-vue/es/modal'
 import { formatAccountImportLine } from '~/shared/account-format'
 import type {
   AccountListItem,
+  AccountNoteColor,
   AccountTagColor,
   ApiEnvelope,
   ImportAccountsResult,
@@ -36,6 +37,17 @@ const ACCOUNT_TAG_OPTIONS: Array<{
   { value: 'purple', label: '紫色' },
   { value: 'gray', label: '灰色' },
 ]
+const ACCOUNT_NOTE_COLOR_OPTIONS: Array<{
+  value: AccountNoteColor
+  label: string
+}> = [
+  { value: 'gray', label: '灰色' },
+  { value: 'blue', label: '蓝色' },
+  { value: 'green', label: '绿色' },
+  { value: 'orange', label: '橙色' },
+  { value: 'red', label: '红色' },
+  { value: 'purple', label: '紫色' },
+]
 const MAIL_PROTOCOL_OPTIONS: Array<{
   value: MailProtocol
   label: string
@@ -48,6 +60,8 @@ const router = useRouter()
 const importText = ref('')
 const importMailProtocol = ref<MailProtocol>('graph')
 const importLoading = ref(false)
+const oauthLoginLoading = ref(false)
+const oauthClientId = ref('')
 const importError = ref('')
 const importModalOpen = ref(false)
 const importResultModalOpen = ref(false)
@@ -66,6 +80,10 @@ const mailboxResponse = ref<ApiEnvelope<MailSummary[]>>(createSuccessEnvelope([]
 const importFileInput = useTemplateRef<HTMLInputElement>('importFileInput')
 const tagFilterPopoverOpen = ref(false)
 const tagUpdatingId = ref<number | null>(null)
+const noteEditing = ref(false)
+const noteDraft = ref('')
+const noteColorDraft = ref<AccountNoteColor>('gray')
+const noteSaving = ref(false)
 
 const mailLimitOptions = [
   { value: 10, label: '最近 10 封' },
@@ -75,6 +93,9 @@ const mailLimitOptions = [
 ]
 
 let accountSearchTimer: ReturnType<typeof setTimeout> | null = null
+let oauthPopupCheckTimer: number | null = null
+let oauthPopupTimeoutTimer: number | null = null
+let oauthPopupClosedGraceTimer: number | null = null
 let mailboxRequestId = 0
 let selectedEmailQueryConsumed = false
 
@@ -156,6 +177,7 @@ const refreshableAccountCount = computed(() =>
 const selectedAccountTagUpdating = computed(() =>
   selectedAccount.value ? tagUpdatingId.value === selectedAccount.value.id : false,
 )
+const selectedAccountNote = computed(() => selectedAccount.value?.note?.trim() ?? '')
 const currentTokenState = computed(() =>
   selectedAccount.value ? getTokenState(selectedAccount.value) : null,
 )
@@ -285,10 +307,29 @@ watch([selectedEmail, mailLimit], ([nextEmail, nextLimit], [prevEmail, prevLimit
 })
 
 onBeforeUnmount(() => {
+  if (import.meta.client) {
+    window.removeEventListener('message', handleOAuthLoginMessage)
+    window.removeEventListener('storage', handleOAuthLoginStorage)
+  }
+
+  clearOAuthPopupTimers()
+
   if (accountSearchTimer) {
     clearTimeout(accountSearchTimer)
     accountSearchTimer = null
   }
+})
+
+watch(selectedAccount, (account) => {
+  noteEditing.value = false
+  noteDraft.value = account?.note ?? ''
+  noteColorDraft.value = account?.noteColor ?? 'gray'
+})
+
+onMounted(() => {
+  window.addEventListener('message', handleOAuthLoginMessage)
+  window.addEventListener('storage', handleOAuthLoginStorage)
+  oauthClientId.value = window.localStorage.getItem('msmail-oauth-client-id') || ''
 })
 
 await loadMailboxMessages()
@@ -517,6 +558,137 @@ async function submitImport() {
   await importAccounts(importText.value)
 }
 
+function startOAuthLogin() {
+  if (!import.meta.client || oauthLoginLoading.value) {
+    return
+  }
+
+  const clientId = oauthClientId.value.trim()
+  if (!clientId) {
+    message.warning('请先填写 Microsoft Entra 应用的 client_id')
+    return
+  }
+
+  window.localStorage.setItem('msmail-oauth-client-id', clientId)
+  window.localStorage.removeItem('msmail-oauth-result')
+  oauthLoginLoading.value = true
+  const loginUrl = `/api/oauth/microsoft/start?protocol=${encodeURIComponent(importMailProtocol.value)}&clientId=${encodeURIComponent(clientId)}`
+  const popup = window.open(
+    loginUrl,
+    'msmail-outlook-login',
+    'popup=yes,width=560,height=720,resizable=yes,scrollbars=yes',
+  )
+
+  if (!popup) {
+    oauthLoginLoading.value = false
+    message.error('登录窗口被浏览器拦截，请允许弹出窗口后重试')
+    return
+  }
+
+  clearOAuthPopupTimers()
+  oauthPopupCheckTimer = window.setInterval(() => {
+    consumeOAuthLoginStorageResult()
+
+    if (!oauthLoginLoading.value) {
+      clearOAuthPopupTimers()
+      return
+    }
+
+    if (!popup.closed) {
+      return
+    }
+
+    if (oauthPopupCheckTimer) {
+      clearInterval(oauthPopupCheckTimer)
+      oauthPopupCheckTimer = null
+    }
+
+    oauthPopupClosedGraceTimer = window.setTimeout(() => {
+      consumeOAuthLoginStorageResult()
+
+      if (oauthLoginLoading.value) {
+        clearOAuthPopupTimers()
+        oauthLoginLoading.value = false
+      }
+    }, 1500)
+  }, 500)
+  oauthPopupTimeoutTimer = window.setTimeout(() => {
+    clearOAuthPopupTimers()
+    if (oauthLoginLoading.value) {
+      oauthLoginLoading.value = false
+      message.warning('Outlook 登录等待时间过长，请检查弹出窗口中的提示后重试')
+    }
+  }, 3 * 60 * 1000)
+}
+
+async function handleOAuthLoginMessage(event: MessageEvent) {
+  if (event.origin !== window.location.origin || event.data?.type !== 'msmail-oauth-result') {
+    return
+  }
+
+  await completeOAuthLogin(event.data)
+}
+
+function handleOAuthLoginStorage(event: StorageEvent) {
+  if (event.key === 'msmail-oauth-result') {
+    consumeOAuthLoginStorageResult()
+  }
+}
+
+function consumeOAuthLoginStorageResult() {
+  if (!import.meta.client) {
+    return
+  }
+
+  const serializedResult = window.localStorage.getItem('msmail-oauth-result')
+  if (!serializedResult) {
+    return
+  }
+
+  window.localStorage.removeItem('msmail-oauth-result')
+
+  try {
+    void completeOAuthLogin(JSON.parse(serializedResult))
+  }
+  catch {
+    void completeOAuthLogin({
+      success: false,
+      message: 'Outlook 登录结果解析失败，请重试',
+    })
+  }
+}
+
+async function completeOAuthLogin(result: { success?: boolean, message?: string }) {
+  clearOAuthPopupTimers()
+  oauthLoginLoading.value = false
+
+  if (!result.success) {
+    message.error(result.message || 'Outlook 登录失败')
+    return
+  }
+
+  message.success(result.message || 'Outlook 登录成功，账号已自动导入')
+  importModalOpen.value = false
+  await refresh()
+}
+
+function clearOAuthPopupTimers() {
+  if (oauthPopupCheckTimer) {
+    clearInterval(oauthPopupCheckTimer)
+    oauthPopupCheckTimer = null
+  }
+
+  if (oauthPopupTimeoutTimer) {
+    clearTimeout(oauthPopupTimeoutTimer)
+    oauthPopupTimeoutTimer = null
+  }
+
+  if (oauthPopupClosedGraceTimer) {
+    clearTimeout(oauthPopupClosedGraceTimer)
+    oauthPopupClosedGraceTimer = null
+  }
+}
+
 function openImportFileSelector() {
   if (importLoading.value) {
     return
@@ -654,6 +826,52 @@ async function updateSelectedAccountTag(tagColor: AccountTagColor | null) {
   if (selectedTagFilter.value && response.data.tagColor !== selectedTagFilter.value) {
     await refresh()
   }
+}
+
+function startEditSelectedAccountNote() {
+  if (!selectedAccount.value) {
+    return
+  }
+
+  noteDraft.value = selectedAccount.value.note ?? ''
+  noteColorDraft.value = selectedAccount.value.noteColor
+  noteEditing.value = true
+}
+
+function cancelEditSelectedAccountNote() {
+  noteDraft.value = selectedAccount.value?.note ?? ''
+  noteColorDraft.value = selectedAccount.value?.noteColor ?? 'gray'
+  noteEditing.value = false
+}
+
+async function saveSelectedAccountNote() {
+  const account = selectedAccount.value
+
+  if (!account || noteSaving.value) {
+    return
+  }
+
+  noteSaving.value = true
+  const nextNote = noteDraft.value.trim()
+  const response = await useApiRequest<AccountListItem>(`/api/accounts/note/${account.id}`, {
+    method: 'PATCH',
+    body: {
+      note: nextNote || null,
+      noteColor: noteColorDraft.value,
+    },
+  })
+  noteSaving.value = false
+
+  if (!response.success || !response.data) {
+    message.error(response.message || '备注保存失败')
+    return
+  }
+
+  replaceAccountInList(response.data)
+  noteDraft.value = response.data.note ?? ''
+  noteColorDraft.value = response.data.noteColor
+  noteEditing.value = false
+  message.success('备注已保存')
 }
 
 function updateTagFilter(tagColor: AccountTagColor | null) {
@@ -1094,6 +1312,15 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
                     <span class="mailbox-list__item-meta-label">最近更新</span>
                     <span class="table-cell__subtext">{{ formatDate(account.updatedAt) }}</span>
                   </div>
+                  <div v-if="account.note" class="mailbox-list__item-meta-row">
+                    <span class="mailbox-list__item-meta-label">备注</span>
+                    <span
+                      class="table-cell__subtext mailbox-list__item-note"
+                      :class="`account-note-color--${account.noteColor}`"
+                    >
+                      {{ account.note }}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1138,6 +1365,81 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
                 <ATypographyTitle :level="2" style="margin: 0">
                   {{ selectedAccount.email }}
                 </ATypographyTitle>
+
+                <div class="mailbox-overview__note">
+                  <div class="mailbox-overview__note-header">
+                    <span class="mailbox-overview__note-label">邮箱备注</span>
+                    <AButton
+                      v-if="!noteEditing"
+                      class="mailbox-overview__note-edit-button"
+                      size="small"
+                      type="primary"
+                      ghost
+                      @click="startEditSelectedAccountNote"
+                    >
+                      {{ selectedAccountNote ? '编辑备注' : '添加备注' }}
+                    </AButton>
+                  </div>
+
+                  <template v-if="noteEditing">
+                    <ATextarea
+                      v-model:value="noteDraft"
+                      :rows="3"
+                      :maxlength="500"
+                      show-count
+                      placeholder="给这个邮箱添加备注，例如用途、来源或分组"
+                    />
+                    <div class="mailbox-overview__note-color-picker">
+                      <button
+                        v-for="color in ACCOUNT_NOTE_COLOR_OPTIONS"
+                        :key="color.value"
+                        type="button"
+                        :class="[
+                          'mailbox-overview__note-color-option',
+                          `account-note-color--${color.value}`,
+                          {
+                            'mailbox-overview__note-color-option--active': noteColorDraft === color.value,
+                          },
+                        ]"
+                        :aria-pressed="noteColorDraft === color.value"
+                        @click="noteColorDraft = color.value"
+                      >
+                        <span
+                          class="mailbox-overview__note-color-dot"
+                          :class="`mailbox-overview__note-color-dot--${color.value}`"
+                        />
+                        {{ color.label }}
+                      </button>
+                    </div>
+                    <div class="mailbox-overview__note-actions">
+                      <AButton size="small" :disabled="noteSaving" @click="cancelEditSelectedAccountNote">
+                        取消
+                      </AButton>
+                      <AButton
+                        size="small"
+                        type="primary"
+                        :loading="noteSaving"
+                        @click="saveSelectedAccountNote"
+                      >
+                        保存备注
+                      </AButton>
+                    </div>
+                  </template>
+
+                  <template v-else>
+                    <span
+                      :class="[
+                        'mailbox-overview__note-text',
+                        `account-note-color--${selectedAccount.noteColor}`,
+                        {
+                          'mailbox-overview__note-text--empty': !selectedAccountNote,
+                        },
+                      ]"
+                    >
+                      {{ selectedAccountNote || '暂无备注' }}
+                    </span>
+                  </template>
+                </div>
               </div>
 
               <div class="mailbox-overview__header-actions">
@@ -1269,6 +1571,10 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
                       <span class="mail-item__subject">{{ item.subject || '（无主题）' }}</span>
                     </div>
 
+                    <p v-if="item.preview" class="mail-item__preview">
+                      {{ item.preview }}
+                    </p>
+
                     <div class="mail-item__meta">
                       <span class="mail-item__sender">{{ item.fromName || '未知发件人' }}</span>
                       <span class="mail-item__address">{{ item.fromAddress }}</span>
@@ -1373,6 +1679,35 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
             :disabled="importLoading"
           />
         </AFormItem>
+
+        <AAlert
+          type="success"
+          show-icon
+          message="推荐：登录 Outlook 后自动导入"
+          description="选择协议后点击下方按钮，在微软登录窗口中完成登录和授权。系统会自动保存邮箱、client_id 和 refresh_token。"
+        />
+
+        <AFormItem label="Microsoft Entra 应用 client_id" style="margin-top: 16px">
+          <AInput
+            v-model:value="oauthClientId"
+            placeholder="首次使用时填写一次，浏览器会在本机记住"
+            :disabled="oauthLoginLoading"
+          />
+        </AFormItem>
+
+        <AButton
+          block
+          type="primary"
+          size="large"
+          style="margin-top: 12px"
+          :loading="oauthLoginLoading"
+          :disabled="importLoading"
+          @click="startOAuthLogin"
+        >
+          登录 Outlook 并自动导入
+        </AButton>
+
+        <ADivider>或使用旧版批量文本导入</ADivider>
 
         <AFormItem label="导入内容">
           <ATextarea

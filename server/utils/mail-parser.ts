@@ -43,6 +43,7 @@ export function toImapMailSummary(message: FetchMessageObject): MailSummary {
     fromName: firstAddressName(message.envelope) || '未知发件人',
     fromAddress: firstAddressEmail(message.envelope) || '-',
     receivedAt: normalizeDate(undefined, message.internalDate, message.envelope?.date),
+    preview: '',
     hasAttachments: hasAttachments(message.bodyStructure),
     isRead: hasSeenFlag(message.flags),
   }

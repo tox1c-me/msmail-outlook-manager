@@ -34,6 +34,13 @@ export default defineNuxtConfig({
     msTokenEndpoint:
       process.env.MS_TOKEN_ENDPOINT ??
       'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+    msAuthorizeEndpoint:
+      process.env.MS_AUTHORIZE_ENDPOINT ??
+      'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+    msClientId: process.env.MS_CLIENT_ID ?? '',
+    msRedirectUri:
+      process.env.MS_REDIRECT_URI ??
+      'http://localhost:3000/api/oauth/microsoft/callback',
     msGraphScope: process.env.MS_GRAPH_SCOPE ?? 'offline_access Mail.Read',
     msImapScope:
       process.env.MS_IMAP_SCOPE ??
