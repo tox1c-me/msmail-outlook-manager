@@ -6,6 +6,7 @@ import { createMicrosoftOAuthLogin } from '~/server/utils/microsoft-oauth-login'
 const querySchema = z.object({
   protocol: z.enum(MAIL_PROTOCOLS).default('graph'),
   clientId: z.string().trim().min(1),
+  loginHint: z.string().trim().email().optional().or(z.literal('')),
 })
 
 export default defineEventHandler((event) => {
@@ -15,5 +16,8 @@ export default defineEventHandler((event) => {
     throw appError(400, 'INVALID_PROTOCOL', '请选择 Graph 或 IMAP 登录方式')
   }
 
-  return sendRedirect(event, createMicrosoftOAuthLogin(result.data.protocol, result.data.clientId))
+  return sendRedirect(
+    event,
+    createMicrosoftOAuthLogin(result.data.protocol, result.data.clientId, result.data.loginHint || undefined),
+  )
 })

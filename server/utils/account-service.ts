@@ -304,6 +304,31 @@ export async function updateAccountNoteById(id: number, note: string | null, not
   return toAccountListItem(account)
 }
 
+export async function updateAccountPasswordByEmail(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase()
+
+  if (!normalizedEmail || !password.trim()) {
+    throw appError(400, 'INVALID_ACCOUNT_PASSWORD', '邮箱和密码不能为空')
+  }
+
+  const existing = await prisma.account.findUnique({
+    where: { email: normalizedEmail },
+  })
+
+  if (!existing) {
+    throw appError(404, 'ACCOUNT_NOT_FOUND', '账号不存在')
+  }
+
+  const account = await prisma.account.update({
+    where: { email: normalizedEmail },
+    data: {
+      password: password.trim(),
+    },
+  })
+
+  return toAccountListItem(account)
+}
+
 export async function refreshExpiredAccounts(): Promise<RefreshExpiredAccountsResult> {
   const now = new Date()
   const refreshableAccounts = await prisma.account.findMany({

@@ -63,6 +63,8 @@ const importMailProtocol = ref<MailProtocol>('graph')
 const importLoading = ref(false)
 const oauthLoginLoading = ref(false)
 const oauthClientId = ref('')
+const oauthLoginEmail = ref('')
+const oauthLoginPassword = ref('')
 const importError = ref('')
 const importModalOpen = ref(false)
 const importResultModalOpen = ref(false)
@@ -575,15 +577,22 @@ function startOAuthLogin() {
   }
 
   const clientId = oauthClientId.value.trim()
+  const loginEmail = oauthLoginEmail.value.trim().toLowerCase()
+  const loginPassword = oauthLoginPassword.value.trim()
   if (!clientId) {
     message.warning('请先填写 Microsoft Entra 应用的 client_id')
+    return
+  }
+
+  if (!loginEmail || !loginPassword) {
+    message.warning('请先填写要登录的邮箱账号和本地保存用密码')
     return
   }
 
   window.localStorage.setItem('msmail-oauth-client-id', clientId)
   window.localStorage.removeItem('msmail-oauth-result')
   oauthLoginLoading.value = true
-  const loginUrl = `/api/oauth/microsoft/start?protocol=${encodeURIComponent(importMailProtocol.value)}&clientId=${encodeURIComponent(clientId)}`
+  const loginUrl = `/api/oauth/microsoft/start?protocol=${encodeURIComponent(importMailProtocol.value)}&clientId=${encodeURIComponent(clientId)}&loginHint=${encodeURIComponent(loginEmail)}`
   const popup = window.open(
     loginUrl,
     'msmail-outlook-login',
@@ -669,7 +678,7 @@ function consumeOAuthLoginStorageResult() {
   }
 }
 
-async function completeOAuthLogin(result: { success?: boolean, message?: string }) {
+async function completeOAuthLogin(result: { success?: boolean, message?: string, email?: string }) {
   clearOAuthPopupTimers()
   oauthLoginLoading.value = false
 
@@ -678,9 +687,44 @@ async function completeOAuthLogin(result: { success?: boolean, message?: string 
     return
   }
 
-  message.success(result.message || 'Outlook 登录成功，账号已自动导入')
+  const savedPassword = await saveOAuthLoginPassword(result.email)
+  message.success(savedPassword
+    ? result.message || 'Outlook 登录成功，账号已自动导入'
+    : 'Outlook 登录成功，账号已导入；本地密码未保存')
   importModalOpen.value = false
   await refresh()
+}
+
+async function saveOAuthLoginPassword(loginEmail: string | undefined) {
+  const expectedEmail = oauthLoginEmail.value.trim().toLowerCase()
+  const password = oauthLoginPassword.value.trim()
+  const actualEmail = loginEmail?.trim().toLowerCase() ?? ''
+
+  if (!expectedEmail || !password || !actualEmail) {
+    return false
+  }
+
+  if (expectedEmail !== actualEmail) {
+    message.warning(`登录成功的账号是 ${actualEmail}，与输入的 ${expectedEmail} 不一致，未保存本地密码`)
+    return false
+  }
+
+  const response = await useApiRequest<AccountListItem>('/api/accounts/password', {
+    method: 'POST',
+    body: {
+      email: actualEmail,
+      password,
+    },
+  })
+
+  if (!response.success || !response.data) {
+    message.warning(response.message || '账号已导入，但本地密码保存失败')
+    return false
+  }
+
+  replaceAccountInList(response.data)
+  oauthLoginPassword.value = ''
+  return true
 }
 
 function clearOAuthPopupTimers() {
@@ -1747,13 +1791,29 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
           type="success"
           show-icon
           message="推荐：登录 Outlook 后自动导入"
-          description="选择协议后点击下方按钮，在微软登录窗口中完成登录和授权。系统会自动保存邮箱、client_id 和 refresh_token。"
+          description="先填写邮箱和本地保存用密码，再在微软登录窗口中完成登录和授权。受浏览器安全限制，密码不会自动填入微软页面。"
         />
 
         <AFormItem label="Microsoft Entra 应用 client_id" style="margin-top: 16px">
           <AInput
             v-model:value="oauthClientId"
             placeholder="首次使用时填写一次，浏览器会在本机记住"
+            :disabled="oauthLoginLoading"
+          />
+        </AFormItem>
+
+        <AFormItem label="Outlook 邮箱账号">
+          <AInput
+            v-model:value="oauthLoginEmail"
+            placeholder="user@example.com"
+            :disabled="oauthLoginLoading"
+          />
+        </AFormItem>
+
+        <AFormItem label="邮箱密码（仅本地保存，用于复制模板）">
+          <AInputPassword
+            v-model:value="oauthLoginPassword"
+            placeholder="OAuth 登录成功后写入本地账号记录"
             :disabled="oauthLoginLoading"
           />
         </AFormItem>

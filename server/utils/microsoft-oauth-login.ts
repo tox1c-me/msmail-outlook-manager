@@ -31,7 +31,11 @@ const TOKEN_REQUEST_TIMEOUT_MS = 15000
 const TOKEN_REQUEST_MAX_ATTEMPTS = 2
 const oauthSessions = new Map<string, OAuthSession>()
 
-export function createMicrosoftOAuthLogin(mailProtocol: MailProtocol, requestedClientId?: string) {
+export function createMicrosoftOAuthLogin(
+  mailProtocol: MailProtocol,
+  requestedClientId?: string,
+  loginHint?: string,
+) {
   const config = useRuntimeConfig()
   const clientId = requireConfig(requestedClientId || config.msClientId, 'client_id')
   const redirectUri = requireConfig(config.msRedirectUri, 'MS_REDIRECT_URI')
@@ -58,6 +62,10 @@ export function createMicrosoftOAuthLogin(mailProtocol: MailProtocol, requestedC
     code_challenge_method: 'S256',
     prompt: 'select_account',
   })
+
+  if (loginHint?.trim()) {
+    params.set('login_hint', loginHint.trim().toLowerCase())
+  }
 
   return `${config.msAuthorizeEndpoint}?${params.toString()}`
 }
