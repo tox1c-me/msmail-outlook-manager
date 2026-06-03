@@ -24,6 +24,8 @@ import type {
 } from '~/shared/types'
 
 const ACCOUNT_SEARCH_DEBOUNCE = 300
+const DEFAULT_COPY_TEMPLATE = '{email}----{password}'
+const COPY_TEMPLATE_STORAGE_KEY = 'msmail-account-copy-template'
 const ACCOUNT_TAG_OPTIONS: Array<{
   value: AccountTagColor
   label: string
@@ -83,6 +85,7 @@ const noteEditing = ref(false)
 const noteDraft = ref('')
 const noteColorDraft = ref<AccountNoteColor>('gray')
 const noteSaving = ref(false)
+const copyTemplate = ref(DEFAULT_COPY_TEMPLATE)
 
 const mailLimitOptions = [
   { value: 10, label: '最近 10 封' },
@@ -329,6 +332,15 @@ onMounted(() => {
   window.addEventListener('message', handleOAuthLoginMessage)
   window.addEventListener('storage', handleOAuthLoginStorage)
   oauthClientId.value = window.localStorage.getItem('msmail-oauth-client-id') || ''
+  copyTemplate.value = window.localStorage.getItem(COPY_TEMPLATE_STORAGE_KEY) || DEFAULT_COPY_TEMPLATE
+})
+
+watch(copyTemplate, (nextTemplate) => {
+  if (!import.meta.client) {
+    return
+  }
+
+  window.localStorage.setItem(COPY_TEMPLATE_STORAGE_KEY, nextTemplate)
 })
 
 await loadMailboxMessages()
@@ -897,14 +909,11 @@ async function copyAccountImportText(account: AccountListItem, event?: MouseEven
   event?.stopPropagation()
 
   try {
-    if (hasRealAccountPassword(account)) {
-      await copyTextToClipboard(`${account.email}----${account.password}`)
-      message.success('已复制账号和密码')
-      return
-    }
-
-    await copyTextToClipboard(account.email)
-    message.warning('OAuth 登录账号没有本地密码，已复制邮箱账号')
+    const copyText = formatAccountCopyText(account)
+    await copyTextToClipboard(copyText)
+    message.success(hasRealAccountPassword(account)
+      ? '已按模板复制账号信息'
+      : 'OAuth 登录账号没有本地密码，已按模板复制账号信息')
   } catch {
     message.error('复制失败，请重试')
   }
@@ -912,6 +921,23 @@ async function copyAccountImportText(account: AccountListItem, event?: MouseEven
 
 function hasRealAccountPassword(account: AccountListItem) {
   return Boolean(account.password && account.password !== 'oauth-login')
+}
+
+function formatAccountCopyText(account: AccountListItem) {
+  const template = copyTemplate.value.trim() || DEFAULT_COPY_TEMPLATE
+  const values: Record<string, string> = {
+    email: account.email,
+    password: hasRealAccountPassword(account) ? account.password : '',
+    clientId: account.clientId,
+    refreshToken: account.refreshToken,
+    note: account.note ?? '',
+  }
+
+  return template.replace(/\{(email|password|clientId|refreshToken|note)\}/g, (_, key: string) => values[key] ?? '')
+}
+
+function setCopyTemplatePreset(template: string) {
+  copyTemplate.value = template
 }
 
 function removeAccount(account: AccountListItem, event?: MouseEvent) {
@@ -1234,6 +1260,34 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
           </APopover>
         </div>
 
+        <div class="workspace-sidebar__copy-template">
+          <div class="workspace-sidebar__copy-template-head">
+            <span>复制模板</span>
+            <button type="button" @click="setCopyTemplatePreset(DEFAULT_COPY_TEMPLATE)">
+              恢复默认
+            </button>
+          </div>
+          <AInput
+            v-model:value="copyTemplate"
+            class="workspace-sidebar__copy-template-input"
+            placeholder="{email}----{password}"
+          />
+          <div class="workspace-sidebar__copy-template-presets">
+            <button type="button" @click="setCopyTemplatePreset('{email}')">
+              只账号
+            </button>
+            <button type="button" @click="setCopyTemplatePreset('{email}----{password}')">
+              账号密码
+            </button>
+            <button type="button" @click="setCopyTemplatePreset('{email}----{password}----{clientId}----{refreshToken}')">
+              完整串
+            </button>
+          </div>
+          <p class="workspace-sidebar__copy-template-help">
+            可用变量：{email}、{password}、{clientId}、{refreshToken}、{note}
+          </p>
+        </div>
+
         <AAlert
           v-if="accountErrorMessage"
           type="error"
@@ -1335,11 +1389,11 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
 
               <div class="mailbox-list__item-actions">
                 <AButton
-                  :aria-label="hasRealAccountPassword(account) ? '复制账号和密码' : '复制邮箱账号'"
+                  aria-label="按自定义模板复制账号信息"
                   class="account-copy-button"
                   type="text"
                   size="small"
-                  :title="hasRealAccountPassword(account) ? '复制账号和密码' : 'OAuth 账号无密码，复制邮箱账号'"
+                  title="按自定义模板复制账号信息"
                   @click="copyAccountImportText(account, $event)"
                 >
                   <template #icon>

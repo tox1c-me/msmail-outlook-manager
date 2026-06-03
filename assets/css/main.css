@@ -431,6 +431,68 @@ code {
   min-width: 0;
 }
 
+.workspace-sidebar__copy-template {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(248, 250, 253, 0.78);
+}
+
+.workspace-sidebar__copy-template-head,
+.workspace-sidebar__copy-template-presets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-sidebar__copy-template-head {
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.workspace-sidebar__copy-template-head button,
+.workspace-sidebar__copy-template-presets button {
+  padding: 3px 8px;
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.06);
+  border: 1px solid rgba(22, 119, 255, 0.12);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.workspace-sidebar__copy-template-head button:hover,
+.workspace-sidebar__copy-template-head button:focus-visible,
+.workspace-sidebar__copy-template-presets button:hover,
+.workspace-sidebar__copy-template-presets button:focus-visible {
+  border-color: rgba(22, 119, 255, 0.28);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
+  outline: none;
+}
+
+.workspace-sidebar__copy-template-input .ant-input {
+  font-family: "SFMono-Regular", "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 12px;
+}
+
+.workspace-sidebar__copy-template-presets {
+  flex-wrap: wrap;
+}
+
+.workspace-sidebar__copy-template-help {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: "SFMono-Regular", "SF Mono", "Menlo", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
 .workspace-sidebar__tag-trigger,
 .workspace-sidebar__tag-filter-option,
 .mailbox-overview__tag-option {
@@ -1540,6 +1602,7 @@ code {
 
 :root[data-theme='dark'] .mailbox-list__item-meta,
 :root[data-theme='dark'] .mailbox-overview__note,
+:root[data-theme='dark'] .workspace-sidebar__copy-template,
 :root[data-theme='dark'] .mail-body,
 :root[data-theme='dark'] .mail-item__address,
 :root[data-theme='dark'] .mail-item__time {
@@ -1554,6 +1617,8 @@ code {
 }
 
 :root[data-theme='dark'] .mailbox-overview__note-color-option,
+:root[data-theme='dark'] .workspace-sidebar__copy-template-head button,
+:root[data-theme='dark'] .workspace-sidebar__copy-template-presets button,
 :root[data-theme='dark'] .workspace-sidebar__tag-trigger,
 :root[data-theme='dark'] .workspace-sidebar__tag-filter-option,
 :root[data-theme='dark'] .page-toolbar__select {
