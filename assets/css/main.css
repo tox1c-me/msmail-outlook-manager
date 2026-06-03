@@ -1230,6 +1230,13 @@ code {
   white-space: nowrap;
 }
 
+.mailbox-overview__auto-refresh-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
 .mailbox-overview__tag-option:disabled {
   cursor: not-allowed;
   opacity: 0.5;

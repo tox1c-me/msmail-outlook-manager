@@ -24,6 +24,7 @@ import type {
 } from '~/shared/types'
 
 const ACCOUNT_SEARCH_DEBOUNCE = 300
+const AUTO_REFRESH_INTERVAL_MS = 60 * 60 * 1000
 const DEFAULT_COPY_TEMPLATE = '{email}----{password}'
 const COPY_TEMPLATE_STORAGE_KEY = 'msmail-account-copy-template'
 const ACCOUNT_TAG_OPTIONS: Array<{
@@ -100,6 +101,7 @@ let accountSearchTimer: ReturnType<typeof setTimeout> | null = null
 let oauthPopupCheckTimer: number | null = null
 let oauthPopupTimeoutTimer: number | null = null
 let oauthPopupClosedGraceTimer: number | null = null
+let mailboxAutoRefreshTimer: number | null = null
 let mailboxRequestId = 0
 let selectedEmailQueryConsumed = false
 
@@ -317,6 +319,7 @@ onBeforeUnmount(() => {
   }
 
   clearOAuthPopupTimers()
+  clearMailboxAutoRefreshTimer()
 
   if (accountSearchTimer) {
     clearTimeout(accountSearchTimer)
@@ -335,6 +338,7 @@ onMounted(() => {
   window.addEventListener('storage', handleOAuthLoginStorage)
   oauthClientId.value = window.localStorage.getItem('msmail-oauth-client-id') || ''
   copyTemplate.value = window.localStorage.getItem(COPY_TEMPLATE_STORAGE_KEY) || DEFAULT_COPY_TEMPLATE
+  startMailboxAutoRefreshTimer()
 })
 
 watch(copyTemplate, (nextTemplate) => {
@@ -352,6 +356,31 @@ async function reloadAccounts() {
 }
 
 async function reloadMailboxMessages() {
+  await loadMailboxMessages({
+    clearBeforeLoad: false,
+  })
+}
+
+function startMailboxAutoRefreshTimer() {
+  clearMailboxAutoRefreshTimer()
+
+  mailboxAutoRefreshTimer = window.setInterval(() => {
+    void autoRefreshMailboxMessages()
+  }, AUTO_REFRESH_INTERVAL_MS)
+}
+
+function clearMailboxAutoRefreshTimer() {
+  if (mailboxAutoRefreshTimer) {
+    clearInterval(mailboxAutoRefreshTimer)
+    mailboxAutoRefreshTimer = null
+  }
+}
+
+async function autoRefreshMailboxMessages() {
+  if (mailboxLoading.value || !selectedEmail.value) {
+    return
+  }
+
   await loadMailboxMessages({
     clearBeforeLoad: false,
   })
@@ -1581,6 +1610,9 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
                   </template>
                   刷新邮件
                 </AButton>
+                <span class="mailbox-overview__auto-refresh-hint">
+                  每小时自动刷新一次
+                </span>
               </div>
             </div>
 
