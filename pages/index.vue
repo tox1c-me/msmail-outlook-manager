@@ -897,11 +897,21 @@ async function copyAccountImportText(account: AccountListItem, event?: MouseEven
   event?.stopPropagation()
 
   try {
-    await copyTextToClipboard(`${account.email}----${account.password}`)
-    message.success('已复制账号和密码')
+    if (hasRealAccountPassword(account)) {
+      await copyTextToClipboard(`${account.email}----${account.password}`)
+      message.success('已复制账号和密码')
+      return
+    }
+
+    await copyTextToClipboard(account.email)
+    message.warning('OAuth 登录账号没有本地密码，已复制邮箱账号')
   } catch {
     message.error('复制失败，请重试')
   }
+}
+
+function hasRealAccountPassword(account: AccountListItem) {
+  return Boolean(account.password && account.password !== 'oauth-login')
 }
 
 function removeAccount(account: AccountListItem, event?: MouseEvent) {
@@ -1325,11 +1335,11 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
 
               <div class="mailbox-list__item-actions">
                 <AButton
-                  aria-label="复制账号和密码"
+                  :aria-label="hasRealAccountPassword(account) ? '复制账号和密码' : '复制邮箱账号'"
                   class="account-copy-button"
                   type="text"
                   size="small"
-                  title="复制账号和密码"
+                  :title="hasRealAccountPassword(account) ? '复制账号和密码' : 'OAuth 账号无密码，复制邮箱账号'"
                   @click="copyAccountImportText(account, $event)"
                 >
                   <template #icon>
