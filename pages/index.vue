@@ -12,7 +12,6 @@ import {
 } from '@ant-design/icons-vue'
 import message from 'ant-design-vue/es/message'
 import Modal from 'ant-design-vue/es/modal'
-import { formatAccountImportLine } from '~/shared/account-format'
 import type {
   AccountListItem,
   AccountNoteColor,
@@ -898,8 +897,8 @@ async function copyAccountImportText(account: AccountListItem, event?: MouseEven
   event?.stopPropagation()
 
   try {
-    await copyTextToClipboard(formatAccountImportLine(account))
-    message.success('已复制账号信息')
+    await copyTextToClipboard(`${account.email}----${account.password}`)
+    message.success('已复制账号和密码')
   } catch {
     message.error('复制失败，请重试')
   }
@@ -1326,11 +1325,11 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
 
               <div class="mailbox-list__item-actions">
                 <AButton
-                  aria-label="复制账号信息"
+                  aria-label="复制账号和密码"
                   class="account-copy-button"
                   type="text"
                   size="small"
-                  title="复制账号信息"
+                  title="复制账号和密码"
                   @click="copyAccountImportText(account, $event)"
                 >
                   <template #icon>
