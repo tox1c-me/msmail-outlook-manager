@@ -613,15 +613,28 @@ function startOAuthLogin() {
     return
   }
 
-  if (!loginEmail || !loginPassword) {
-    message.warning('请先填写要登录的邮箱账号和本地保存用密码')
+  if (loginEmail && !isEmailLike(loginEmail)) {
+    message.warning('Outlook 邮箱账号格式不正确')
     return
   }
 
   window.localStorage.setItem('msmail-oauth-client-id', clientId)
   window.localStorage.removeItem('msmail-oauth-result')
   oauthLoginLoading.value = true
-  const loginUrl = `/api/oauth/microsoft/start?protocol=${encodeURIComponent(importMailProtocol.value)}&clientId=${encodeURIComponent(clientId)}&loginHint=${encodeURIComponent(loginEmail)}`
+  const loginParams = new URLSearchParams({
+    protocol: importMailProtocol.value,
+    clientId,
+  })
+
+  if (loginEmail) {
+    loginParams.set('loginHint', loginEmail)
+  }
+
+  if (!loginPassword) {
+    message.info('未填写本地密码，本次登录成功后只导入授权信息')
+  }
+
+  const loginUrl = `/api/oauth/microsoft/start?${loginParams.toString()}`
   const popup = window.open(
     loginUrl,
     'msmail-outlook-login',
@@ -729,11 +742,11 @@ async function saveOAuthLoginPassword(loginEmail: string | undefined) {
   const password = oauthLoginPassword.value.trim()
   const actualEmail = loginEmail?.trim().toLowerCase() ?? ''
 
-  if (!expectedEmail || !password || !actualEmail) {
+  if (!password || !actualEmail) {
     return false
   }
 
-  if (expectedEmail !== actualEmail) {
+  if (expectedEmail && expectedEmail !== actualEmail) {
     message.warning(`登录成功的账号是 ${actualEmail}，与输入的 ${expectedEmail} 不一致，未保存本地密码`)
     return false
   }
@@ -994,6 +1007,10 @@ async function copyAccountImportText(account: AccountListItem, event?: MouseEven
 
 function hasRealAccountPassword(account: AccountListItem) {
   return Boolean(account.password && account.password !== 'oauth-login')
+}
+
+function isEmailLike(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 function formatAccountCopyText(account: AccountListItem) {
@@ -1823,7 +1840,7 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
           type="success"
           show-icon
           message="推荐：登录 Outlook 后自动导入"
-          description="先填写邮箱和本地保存用密码，再在微软登录窗口中完成登录和授权。受浏览器安全限制，密码不会自动填入微软页面。"
+          description="邮箱和本地密码为可选项：填写邮箱可预填微软登录账号，填写密码会在 OAuth 成功后保存到本地用于复制模板。受浏览器安全限制，密码不会自动填入微软页面。"
         />
 
         <AFormItem label="Microsoft Entra 应用 client_id" style="margin-top: 16px">
@@ -1837,7 +1854,7 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
         <AFormItem label="Outlook 邮箱账号">
           <AInput
             v-model:value="oauthLoginEmail"
-            placeholder="user@example.com"
+            placeholder="可选：user@example.com"
             :disabled="oauthLoginLoading"
           />
         </AFormItem>
@@ -1845,7 +1862,7 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
         <AFormItem label="邮箱密码（仅本地保存，用于复制模板）">
           <AInputPassword
             v-model:value="oauthLoginPassword"
-            placeholder="OAuth 登录成功后写入本地账号记录"
+            placeholder="可选：OAuth 登录成功后写入本地账号记录"
             :disabled="oauthLoginLoading"
           />
         </AFormItem>
