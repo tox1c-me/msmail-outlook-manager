@@ -89,6 +89,9 @@ const noteDraft = ref('')
 const noteColorDraft = ref<AccountNoteColor>('gray')
 const noteSaving = ref(false)
 const copyTemplate = ref(DEFAULT_COPY_TEMPLATE)
+const passwordEditing = ref(false)
+const passwordDraft = ref('')
+const passwordSaving = ref(false)
 
 const mailLimitOptions = [
   { value: 10, label: '最近 10 封' },
@@ -331,6 +334,8 @@ watch(selectedAccount, (account) => {
   noteEditing.value = false
   noteDraft.value = account?.note ?? ''
   noteColorDraft.value = account?.noteColor ?? 'gray'
+  passwordEditing.value = false
+  passwordDraft.value = ''
 })
 
 onMounted(() => {
@@ -939,6 +944,54 @@ function cancelEditSelectedAccountNote() {
   noteDraft.value = selectedAccount.value?.note ?? ''
   noteColorDraft.value = selectedAccount.value?.noteColor ?? 'gray'
   noteEditing.value = false
+}
+
+function startEditSelectedAccountPassword() {
+  if (!selectedAccount.value) {
+    return
+  }
+
+  passwordDraft.value = hasRealAccountPassword(selectedAccount.value) ? selectedAccount.value.password : ''
+  passwordEditing.value = true
+}
+
+function cancelEditSelectedAccountPassword() {
+  passwordDraft.value = ''
+  passwordEditing.value = false
+}
+
+async function saveSelectedAccountPassword() {
+  const account = selectedAccount.value
+  const nextPassword = passwordDraft.value.trim()
+
+  if (!account || passwordSaving.value) {
+    return
+  }
+
+  if (!nextPassword) {
+    message.warning('请填写本地密码')
+    return
+  }
+
+  passwordSaving.value = true
+  const response = await useApiRequest<AccountListItem>('/api/accounts/password', {
+    method: 'POST',
+    body: {
+      email: account.email,
+      password: nextPassword,
+    },
+  })
+  passwordSaving.value = false
+
+  if (!response.success || !response.data) {
+    message.error(response.message || '本地密码保存失败')
+    return
+  }
+
+  replaceAccountInList(response.data)
+  passwordDraft.value = ''
+  passwordEditing.value = false
+  message.success('本地密码已保存')
 }
 
 async function saveSelectedAccountNote() {
@@ -1590,6 +1643,56 @@ function createSuccessEnvelope<T>(data: T): ApiEnvelope<T> {
                       ]"
                     >
                       {{ selectedAccountNote || '暂无备注' }}
+                    </span>
+                  </template>
+                </div>
+
+                <div class="mailbox-overview__password">
+                  <div class="mailbox-overview__note-header">
+                    <span class="mailbox-overview__note-label">本地密码</span>
+                    <AButton
+                      v-if="!passwordEditing"
+                      class="mailbox-overview__note-edit-button"
+                      size="small"
+                      type="primary"
+                      ghost
+                      @click="startEditSelectedAccountPassword"
+                    >
+                      {{ hasRealAccountPassword(selectedAccount) ? '修改密码' : '设置密码' }}
+                    </AButton>
+                  </div>
+
+                  <template v-if="passwordEditing">
+                    <AInputPassword
+                      v-model:value="passwordDraft"
+                      placeholder="仅保存到本地数据库，用于复制模板"
+                      @keydown.enter.prevent="saveSelectedAccountPassword"
+                    />
+                    <div class="mailbox-overview__note-actions">
+                      <AButton size="small" :disabled="passwordSaving" @click="cancelEditSelectedAccountPassword">
+                        取消
+                      </AButton>
+                      <AButton
+                        size="small"
+                        type="primary"
+                        :loading="passwordSaving"
+                        @click="saveSelectedAccountPassword"
+                      >
+                        保存密码
+                      </AButton>
+                    </div>
+                  </template>
+
+                  <template v-else>
+                    <span
+                      :class="[
+                        'mailbox-overview__password-status',
+                        {
+                          'mailbox-overview__password-status--empty': !hasRealAccountPassword(selectedAccount),
+                        },
+                      ]"
+                    >
+                      {{ hasRealAccountPassword(selectedAccount) ? '已配置本地密码，可用于复制模板' : '未配置本地密码，复制模板中的 {password} 会为空' }}
                     </span>
                   </template>
                 </div>

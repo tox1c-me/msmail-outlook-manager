@@ -1100,7 +1100,8 @@ code {
   flex-wrap: wrap;
 }
 
-.mailbox-overview__note {
+.mailbox-overview__note,
+.mailbox-overview__password {
   display: grid;
   gap: 10px;
   width: min(720px, 100%);
@@ -1135,6 +1136,17 @@ code {
 }
 
 .mailbox-overview__note-text--empty {
+  color: #98a2b3;
+}
+
+.mailbox-overview__password-status {
+  color: #16a34a;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.mailbox-overview__password-status--empty {
   color: #98a2b3;
 }
 
@@ -1609,6 +1621,7 @@ code {
 
 :root[data-theme='dark'] .mailbox-list__item-meta,
 :root[data-theme='dark'] .mailbox-overview__note,
+:root[data-theme='dark'] .mailbox-overview__password,
 :root[data-theme='dark'] .workspace-sidebar__copy-template,
 :root[data-theme='dark'] .mail-body,
 :root[data-theme='dark'] .mail-item__address,
