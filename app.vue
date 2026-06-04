@@ -3,8 +3,25 @@ import { theme as antTheme } from 'ant-design-vue'
 
 const route = useRoute()
 const isMailboxPage = computed(() => route.path.startsWith('/account/'))
-const colorMode = ref<'light' | 'dark'>('light')
-const isDarkMode = computed(() => colorMode.value === 'dark')
+type ColorMode = 'auto' | 'light' | 'dark'
+
+const colorMode = ref<ColorMode>('auto')
+const systemPrefersDark = ref(false)
+const activeColorMode = computed<'light' | 'dark'>(() => {
+  if (colorMode.value === 'auto') {
+    return systemPrefersDark.value ? 'dark' : 'light'
+  }
+
+  return colorMode.value
+})
+const isDarkMode = computed(() => activeColorMode.value === 'dark')
+const colorModeTitle = computed(() => {
+  if (colorMode.value === 'auto') {
+    return `跟随系统：当前${isDarkMode.value ? '暗黑' : '浅色'}`
+  }
+
+  return isDarkMode.value ? '暗黑模式' : '浅色模式'
+})
 const showHeader = computed(() => {
   if (route.path === '/') {
     return false
@@ -42,17 +59,30 @@ const themeConfig = computed(() => ({
 
 onMounted(() => {
   const savedMode = window.localStorage.getItem('msmail-color-mode')
-  colorMode.value = savedMode === 'dark' ? 'dark' : 'light'
+  colorMode.value = isColorMode(savedMode) ? savedMode : 'auto'
+
+  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+  systemPrefersDark.value = mediaQuery.matches
+  const handleSystemThemeChange = (event: MediaQueryListEvent) => {
+    systemPrefersDark.value = event.matches
+  }
+
+  mediaQuery.addEventListener('change', handleSystemThemeChange)
+
+  onBeforeUnmount(() => {
+    mediaQuery.removeEventListener('change', handleSystemThemeChange)
+  })
 })
 
 watch(
-  colorMode,
-  (mode) => {
+  [colorMode, activeColorMode],
+  ([mode, activeMode]) => {
     if (!import.meta.client) {
       return
     }
 
-    document.documentElement.dataset.theme = mode
+    document.documentElement.dataset.theme = activeMode
+    document.documentElement.dataset.themeMode = mode
     window.localStorage.setItem('msmail-color-mode', mode)
   },
   {
@@ -61,7 +91,21 @@ watch(
 )
 
 function toggleColorMode() {
-  colorMode.value = isDarkMode.value ? 'light' : 'dark'
+  if (colorMode.value === 'auto') {
+    colorMode.value = 'light'
+    return
+  }
+
+  if (colorMode.value === 'light') {
+    colorMode.value = 'dark'
+    return
+  }
+
+  colorMode.value = 'auto'
+}
+
+function isColorMode(value: string | null): value is ColorMode {
+  return value === 'auto' || value === 'light' || value === 'dark'
 }
 </script>
 
@@ -99,15 +143,22 @@ function toggleColorMode() {
 
       <button
         type="button"
-        :class="['theme-toggle', { 'theme-toggle--dark': isDarkMode }]"
+        :class="[
+          'theme-toggle',
+          {
+            'theme-toggle--dark': isDarkMode,
+            'theme-toggle--auto': colorMode === 'auto',
+          },
+        ]"
         :aria-pressed="isDarkMode"
-        :aria-label="isDarkMode ? '切换为浅色模式' : '切换为暗黑模式'"
-        :title="isDarkMode ? '切换为浅色模式' : '切换为暗黑模式'"
+        :aria-label="`当前${colorModeTitle}，点击切换主题模式`"
+        :title="`当前${colorModeTitle}，点击切换：跟随系统 / 浅色 / 暗黑`"
         @click="toggleColorMode"
       >
         <span class="theme-toggle__icon theme-toggle__icon--sun" aria-hidden="true">☀</span>
         <span class="theme-toggle__icon theme-toggle__icon--moon" aria-hidden="true">☾</span>
         <span class="theme-toggle__thumb" aria-hidden="true" />
+        <span class="theme-toggle__auto-mark" aria-hidden="true">A</span>
       </button>
     </ALayout>
   </AConfigProvider>
